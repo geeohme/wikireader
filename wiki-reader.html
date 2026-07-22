@@ -3,7 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Folio — Local Wiki Reader</title>
+<title>WikiReader — Your notes, with room to breathe</title>
+<meta name="description" content="Open a folder of Markdown files as a private, linked reading space. Your wiki stays on your device.">
+<meta name="theme-color" content="#f1f2f3">
+<link rel="canonical" href="https://wikireader.generationai.me/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WikiReader">
+<meta property="og:url" content="https://wikireader.generationai.me/">
+<meta property="og:title" content="WikiReader — Your notes, with room to breathe">
+<meta property="og:description" content="Open a folder of Markdown files as a private, linked reading space. Your wiki stays on your device.">
+<meta property="og:image" content="https://wikireader.generationai.me/social-card.png">
+<meta property="og:image:secure_url" content="https://wikireader.generationai.me/social-card.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WikiReader editorial preview with a red folder icon and the words Your notes, with room to breathe">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WikiReader — Your notes, with room to breathe">
+<meta name="twitter:description" content="Open a folder of Markdown files as a private, linked reading space. Your wiki stays on your device.">
+<meta name="twitter:image" content="https://wikireader.generationai.me/social-card.png">
+<meta name="twitter:image:alt" content="WikiReader editorial preview with a red folder icon and the words Your notes, with room to breathe">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <style>
   :root {
@@ -174,7 +197,7 @@
 <body>
 
 <div id="landing">
-  <div class="landing-brand"><span class="brand-mark"></span>Folio</div>
+  <div class="landing-brand"><span class="brand-mark"></span>WikiReader</div>
   <div class="local-note">Private by design</div>
   <div class="landing-copy">
     <div class="eyebrow">Local wiki reader / 01</div>
@@ -197,7 +220,7 @@
 
 <div id="sidebar" class="hidden">
   <div id="sidebar-header">
-    <div class="sidebar-brand"><span class="brand-mark"></span>Folio / Reader</div>
+    <div class="sidebar-brand"><span class="brand-mark"></span>WikiReader / Local</div>
     <div id="wiki-title"></div>
     <div id="wiki-meta"></div>
     <div class="search-wrap">
@@ -415,7 +438,7 @@
     main.scrollTop = 0;
     if (hash) scrollToHash(slug(decodeURIComponent(hash)));
     if (pushState) history.pushState({ key }, '', '#' + encodeURIComponent(d.path));
-    document.title = d.title + ' — Folio';
+    document.title = d.title + ' — WikiReader';
     if (window.innerWidth <= 760) {
       sidebar.classList.remove('open');
       $('menu-toggle').setAttribute('aria-expanded', 'false');
