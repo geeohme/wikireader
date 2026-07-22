@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folio — Local Wiki Reader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --paper: #f1f2f3;
+    --white: #fbfbfa;
+    --ink: #191a17;
+    --muted: #696c68;
+    --faint: #d6d8d5;
+    --accent: #df452f;
+    --acid: #c9d66b;
+    --code: #e8eae8;
+    --mark: #e6ebaa;
+    --sans: "Arial Narrow", "Avenir Next Condensed", "Helvetica Neue", Arial, sans-serif;
+    --serif: Iowan Old Style, Baskerville, "Times New Roman", serif;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--sans); background: var(--white); color: var(--ink);
+    display: flex; overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; }
+  button:focus-visible, input:focus-visible, a:focus-visible, #dropzone:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
+
+  /* ---------- Landing ---------- */
+  #landing {
+    position: fixed; inset: 0; z-index: 50; overflow: auto; background-color: var(--paper);
+    background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(25% - 1px), rgba(25,26,23,.055) 25%);
+    padding: clamp(24px, 4vw, 62px); display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, .7fr);
+    grid-template-rows: auto 1fr auto; gap: 42px 7vw;
+  }
+  .landing-brand { grid-column: 1; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+  .brand-mark { width: 11px; height: 11px; background: var(--accent); transform: rotate(45deg); }
+  .local-note { grid-column: 2; justify-self: end; display: flex; align-items: center; gap: 9px; color: var(--muted); font: 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  .local-note::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--acid); border: 1px solid var(--ink); }
+  .landing-copy { grid-column: 1; align-self: center; padding: 4vh 0; }
+  .eyebrow { margin-bottom: 22px; color: var(--accent); font: 700 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  #landing h1 { max-width: 900px; margin: 0; font: 400 clamp(58px, 8.2vw, 126px)/.86 var(--serif); letter-spacing: -.065em; }
+  #landing h1 em { font-weight: 400; color: var(--accent); }
+  .landing-intro { max-width: 530px; margin: 34px 0 0 12%; color: #464945; font: 18px/1.55 var(--serif); }
+  .landing-action { grid-column: 2; align-self: center; }
+  #dropzone {
+    position: relative; min-height: 380px; border: 1px solid var(--ink); background: var(--white);
+    padding: 32px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+    transition: transform .22s ease, background-color .22s ease, color .22s ease;
+    box-shadow: 12px 12px 0 var(--ink);
+  }
+  #dropzone::after { content: ""; position: absolute; inset: 8px; border: 1px dashed var(--faint); pointer-events: none; }
+  #dropzone:hover { transform: translate(-4px, -4px); box-shadow: 16px 16px 0 var(--ink); }
+  #dropzone.dragover { transform: translate(-6px, -6px); background: var(--acid); box-shadow: 18px 18px 0 var(--ink); }
+  .drop-index { position: relative; z-index: 1; font: 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+  .folder-drawing { position: relative; z-index: 1; width: 126px; height: 96px; margin: 22px 0; border: 2px solid currentColor; align-self: center; }
+  .folder-drawing::before { content: ""; position: absolute; width: 50px; height: 16px; left: -2px; top: -17px; border: 2px solid currentColor; border-bottom: 0; }
+  .folder-drawing::after { content: "+"; position: absolute; inset: 0; display: grid; place-items: center; font: 300 42px/1 var(--sans); }
+  .drop-copy { position: relative; z-index: 1; }
+  .drop-title { display: block; max-width: 270px; font: 400 30px/1.05 var(--serif); letter-spacing: -.02em; }
+  .drop-sub { display: block; margin-top: 14px; color: var(--muted); font: 12px/1.5 var(--mono); }
+  #dropzone.dragover .drop-sub { color: var(--ink); }
+  .landing-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 24px; padding-top: 20px; border-top: 1px solid var(--ink); color: var(--muted); font: 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar {
+    width: 324px; min-width: 324px; height: 100vh; background: var(--paper); border-right: 1px solid var(--ink);
+    display: flex; flex-direction: column; position: relative; z-index: 20;
+  }
+  #sidebar-header { padding: 28px 24px 20px; border-bottom: 1px solid var(--ink); }
+  .sidebar-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 38px; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+  .sidebar-brand .brand-mark { width: 8px; height: 8px; }
+  #wiki-title { font: 400 30px/1.05 var(--serif); letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #wiki-meta { margin-top: 7px; color: var(--muted); font: 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .search-wrap { position: relative; margin-top: 25px; }
+  .search-wrap svg { position: absolute; left: 0; top: 10px; width: 15px; height: 15px; pointer-events: none; }
+  #searchbox {
+    width: 100%; padding: 9px 52px 9px 25px; border: 0; border-bottom: 1px solid #aeb1ad; border-radius: 0;
+    background: transparent; color: var(--ink); font-size: 14px; outline: none;
+  }
+  #searchbox::placeholder { color: #898c88; }
+  #searchbox:focus { border-bottom-color: var(--accent); }
+  .search-key { position: absolute; right: 0; top: 9px; color: var(--muted); font: 9px/1.7 var(--mono); }
+  #filelist, #results { overflow-y: auto; flex: 1; padding: 20px 14px 32px; }
+  .file-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 10px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.25; }
+  .file-item::before { content: "—"; color: #a7aaa6; flex: none; }
+  .file-item:hover { color: var(--accent); }
+  .file-item.active { background: var(--ink); color: var(--white); }
+  .file-item.active::before { color: var(--acid); }
+  .dir-label { padding: 22px 10px 7px; color: var(--muted); font: 10px/1.2 var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+  #sidebar-footer { padding: 15px 24px; border-top: 1px solid var(--ink); color: var(--muted); display: flex; justify-content: space-between; align-items: center; font: 10px/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+  #reopen { padding: 0 0 2px; background: none; border: 0; border-bottom: 1px solid currentColor; color: var(--accent); cursor: pointer; font: inherit; text-transform: uppercase; }
+  #results { display: none; }
+  .result { padding: 12px 10px; border-bottom: 1px solid var(--faint); cursor: pointer; }
+  .result:hover { background: var(--white); }
+  .result .rtitle { color: var(--ink); font: 600 15px/1.2 var(--serif); }
+  .result .rsnip { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .result mark, #content mark { background: var(--mark); color: inherit; padding: 0 1px; }
+  #no-results { color: var(--muted); font: 12px/1.5 var(--mono); padding: 14px 10px; }
+
+  /* ---------- Reader ---------- */
+  #main { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; background: var(--white); }
+  #reader-toolbar { position: sticky; top: 0; z-index: 10; height: 56px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--faint); background: rgba(251,251,250,.94); backdrop-filter: blur(8px); }
+  #current-section { color: var(--muted); font: 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reader-status { display: flex; align-items: center; gap: 8px; color: var(--muted); font: 10px/1 var(--mono); text-transform: uppercase; }
+  .reader-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--acid); border: 1px solid var(--ink); }
+  #menu-toggle { display: none; border: 0; background: none; padding: 4px; cursor: pointer; color: var(--ink); }
+  #content { max-width: 830px; margin: 0 auto; padding: clamp(48px, 8vw, 104px) clamp(28px, 6vw, 76px) 140px; color: #262722; font: 18px/1.72 var(--serif); }
+  #content h1, #content h2, #content h3, #content h4 { color: var(--ink); scroll-margin-top: 82px; }
+  #content h1 { margin: 0 0 42px; font: 400 clamp(50px, 7vw, 82px)/.98 var(--serif); letter-spacing: -.05em; }
+  #content h2 { margin: 64px 0 20px; padding-top: 17px; border-top: 1px solid var(--ink); font: 400 34px/1.12 var(--serif); letter-spacing: -.025em; }
+  #content h3 { margin: 42px 0 15px; font: 700 20px/1.2 var(--sans); }
+  #content h4 { margin-top: 34px; font: 700 12px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  #content p { margin: 0 0 1.35em; }
+  #content a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  #content a:hover { text-decoration-thickness: 2px; }
+  #content a.dead { color: var(--muted); text-decoration-style: dashed; cursor: help; }
+  #content code { background: var(--code); padding: 2px 5px; font: .82em/1.4 var(--mono); }
+  #content pre { margin: 28px 0; padding: 22px 24px; overflow-x: auto; background: var(--ink); color: #ecede8; border-left: 5px solid var(--acid); font-size: 14px; }
+  #content pre code { padding: 0; background: none; color: inherit; }
+  #content blockquote { margin: 34px 0; padding: 6px 0 6px 27px; border-left: 5px solid var(--accent); color: #4e514c; font-size: 22px; line-height: 1.5; }
+  #content ul, #content ol { padding-left: 1.4em; }
+  #content li { margin: .45em 0; padding-left: .25em; }
+  #content table { border-collapse: collapse; width: 100%; margin: 28px 0; font: 14px/1.45 var(--sans); display: block; overflow-x: auto; }
+  #content th, #content td { border-bottom: 1px solid var(--faint); padding: 11px 16px 11px 0; text-align: left; }
+  #content th { border-bottom-color: var(--ink); font: 700 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  #content img { display: block; max-width: 100%; margin: 34px auto; border: 1px solid var(--ink); }
+  #content hr { border: 0; border-top: 1px solid var(--ink); margin: 50px 0; }
+  #crumb { margin-bottom: 24px; color: var(--muted); font: 10px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  #backlinks { margin-top: 80px; padding-top: 18px; border-top: 1px solid var(--ink); }
+  #backlinks .bl-title { margin-bottom: 14px; color: var(--muted); font: 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  #backlinks a { display: inline-block; margin: 0 15px 8px 0; color: var(--accent); font: 14px/1.4 var(--sans); }
+  .hidden { display: none !important; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #bfc2be; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  kbd { background: var(--code); border: 1px solid var(--faint); padding: 1px 5px; font: 10px var(--mono); }
+
+  @media (max-width: 980px) {
+    #landing { grid-template-columns: minmax(0, 1fr) minmax(290px, .65fr); gap: 36px; }
+    #landing h1 { font-size: clamp(56px, 9vw, 88px); }
+    #dropzone { min-height: 350px; }
+  }
+  @media (max-width: 760px) {
+    #landing { display: block; padding: 24px 20px 42px; background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(50% - 1px), rgba(25,26,23,.05) 50%); }
+    .landing-brand { margin-bottom: 64px; }
+    .local-note { position: absolute; top: 28px; right: 20px; }
+    .landing-copy { padding: 0; }
+    #landing h1 { font-size: clamp(54px, 17vw, 78px); }
+    .landing-intro { margin: 24px 0 42px; font-size: 17px; }
+    #dropzone { min-height: 310px; padding: 26px; box-shadow: 8px 8px 0 var(--ink); }
+    #dropzone:hover { transform: translate(-2px,-2px); box-shadow: 10px 10px 0 var(--ink); }
+    .folder-drawing { width: 98px; height: 74px; }
+    .landing-foot { margin-top: 52px; flex-direction: column; gap: 8px; }
+    #sidebar { position: fixed; left: 0; top: 0; transform: translateX(-105%); transition: transform .24s ease; box-shadow: 8px 0 0 rgba(25,26,23,.15); }
+    #sidebar.open { transform: translateX(0); }
+    #menu-toggle { display: block; }
+    #reader-toolbar { padding: 0 18px; gap: 16px; }
+    #current-section { flex: 1; }
+    .reader-status { display: none; }
+    #content { font-size: 17px; line-height: 1.68; }
+    #content h1 { font-size: clamp(44px, 14vw, 68px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <div class="landing-brand"><span class="brand-mark"></span>Folio</div>
+  <div class="local-note">Private by design</div>
+  <div class="landing-copy">
+    <div class="eyebrow">Local wiki reader / 01</div>
+    <h1>Your notes,<br>with room <em>to breathe.</em></h1>
+    <p class="landing-intro">Open any folder of Markdown files as a calm, linked reading space. Search across the archive while every byte stays on your machine.</p>
+  </div>
+  <div class="landing-action">
+    <div id="dropzone" role="button" tabindex="0" aria-label="Choose or drop a folder of Markdown files">
+      <span class="drop-index">Open an archive / 02</span>
+      <span class="folder-drawing" aria-hidden="true"></span>
+      <span class="drop-copy">
+        <span class="drop-title">Drop your wiki folder here</span>
+        <span class="drop-sub">or click to browse · .md / .markdown</span>
+      </span>
+    </div>
+  </div>
+  <div class="landing-foot"><span>Your folder is read in this tab and never uploaded.</span><span>Markdown + linked images</span></div>
+  <input type="file" id="dirpicker" webkitdirectory multiple style="display:none">
+</div>
+
+<div id="sidebar" class="hidden">
+  <div id="sidebar-header">
+    <div class="sidebar-brand"><span class="brand-mark"></span>Folio / Reader</div>
+    <div id="wiki-title"></div>
+    <div id="wiki-meta"></div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 5 5"></path></svg>
+      <input id="searchbox" type="search" placeholder="Search this wiki" autocomplete="off">
+      <span class="search-key">⌘ K</span>
+    </div>
+  </div>
+  <div id="filelist"></div>
+  <div id="results"></div>
+  <div id="sidebar-footer">
+    <span id="doc-count"></span>
+    <button id="reopen" title="Open a different folder">Open folder…</button>
+  </div>
+</div>
+
+<div id="main" class="hidden">
+  <div id="reader-toolbar">
+    <button id="menu-toggle" aria-label="Open wiki navigation" aria-expanded="false">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h16M2 10h16M2 15h16"/></svg>
+    </button>
+    <span id="current-section">Local archive</span>
+    <span class="reader-status">Reading locally</span>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // docs: key = normalized relative path (lowercase, no leading ./), value = {path, name, title, raw, headings}
+  let docs = new Map();
+  let assets = new Map();      // non-md files -> object URL
+  let current = null;          // current doc key
+  let backlinkIndex = new Map();
+  let rootName = '';
+
+  const $ = id => document.getElementById(id);
+  const landing = $('landing'), sidebar = $('sidebar'), main = $('main'),
+        content = $('content'), filelist = $('filelist'), results = $('results'),
+        searchbox = $('searchbox');
+
+  marked.setOptions({ gfm: true, breaks: false });
+
+  /* ---------------- ingestion ---------------- */
+
+  function normPath(p) {
+    return p.replace(/^\.\//, '').replace(/\\/g, '/');
+  }
+
+  async function ingestFiles(fileEntries) {
+    // fileEntries: [{relPath, file}]
+    docs.clear();
+    assets.forEach(u => URL.revokeObjectURL(u));
+    assets.clear();
+
+    const mdEntries = fileEntries.filter(e => /\.(md|markdown)$/i.test(e.relPath));
+    if (!mdEntries.length) { alert('No .md files found in that folder.'); return false; }
+
+    // strip common root dir from paths
+    const parts0 = fileEntries[0].relPath.split('/');
+    rootName = parts0.length > 1 ? parts0[0] : 'wiki';
+    const stripRoot = fileEntries.every(e => e.relPath.split('/')[0] === rootName && e.relPath.includes('/'));
+
+    for (const e of fileEntries) {
+      let rel = normPath(e.relPath);
+      if (stripRoot) rel = rel.split('/').slice(1).join('/');
+      if (!rel) continue;
+      if (/\.(md|markdown)$/i.test(rel)) {
+        const raw = await e.file.text();
+        const name = rel.split('/').pop();
+        const m = raw.match(/^#\s+(.+)$/m);
+        docs.set(rel.toLowerCase(), {
+          path: rel, name,
+          title: m ? m[1].replace(/[*_`]/g, '').trim() : name.replace(/\.(md|markdown)$/i, ''),
+          raw
+        });
+      } else if (/\.(png|jpe?g|gif|svg|webp|avif)$/i.test(rel)) {
+        assets.set(rel.toLowerCase(), URL.createObjectURL(e.file));
+      }
+    }
+    buildBacklinks();
+    return true;
+  }
+
+  function extractLinks(raw) {
+    const out = [];
+    let m;
+    const re1 = /\[([^\]]*)\]\(([^)\s]+?\.(?:md|markdown))(?:#[^)]*)?\)/gi;
+    while ((m = re1.exec(raw))) out.push(m[2]);
+    const re2 = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]/g;
+    while ((m = re2.exec(raw))) out.push(m[1].trim());
+    return out;
+  }
+
+  function resolveDoc(link, fromPath) {
+    // link may be relative path, filename, or wikilink title
+    let l = normPath(decodeURIComponent(link)).toLowerCase();
+    if (!/\.(md|markdown)$/.test(l)) {
+      // wikilink: match by filename or title
+      const guess = l + '.md';
+      for (const [k, d] of docs) {
+        if (k === guess || k.endsWith('/' + guess) || d.name.toLowerCase() === guess) return k;
+      }
+      for (const [k, d] of docs) if (d.title.toLowerCase() === l) return k;
+      return null;
+    }
+    // resolve relative to current doc's directory
+    const baseDir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/') + 1) : '';
+    const joined = normalizeDots(baseDir.toLowerCase() + l);
+    if (docs.has(joined)) return joined;
+    if (docs.has(l)) return l;
+    const fname = l.split('/').pop();
+    for (const [k, d] of docs) if (d.name.toLowerCase() === fname) return k;
+    return null;
+  }
+
+  function normalizeDots(p) {
+    const out = [];
+    for (const seg of p.split('/')) {
+      if (seg === '..') out.pop();
+      else if (seg !== '.' && seg !== '') out.push(seg);
+    }
+    return out.join('/');
+  }
+
+  function resolveAsset(link, fromPath) {
+    let l = normPath(decodeURIComponent(link)).toLowerCase();
+    const baseDir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/') + 1) : '';
+    const joined = normalizeDots(baseDir.toLowerCase() + l);
+    return assets.get(joined) || assets.get(l) || null;
+  }
+
+  function buildBacklinks() {
+    backlinkIndex.clear();
+    for (const [key, d] of docs) {
+      for (const link of extractLinks(d.raw)) {
+        const target = resolveDoc(link, d.path);
+        if (target && target !== key) {
+          if (!backlinkIndex.has(target)) backlinkIndex.set(target, new Set());
+          backlinkIndex.get(target).add(key);
+        }
+      }
+    }
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function preprocess(raw) {
+    // convert [[wikilinks]] into md links with a marker scheme
+    return raw.replace(/\[\[([^\]|#]+)(#[^\]|]*)?(?:\|([^\]]*))?\]\]/g, (_, page, hash, label) =>
+      `[${label || page.trim()}](wikilink:${encodeURIComponent(page.trim())}${hash || ''})`);
+  }
+
+  function render(key, hash, pushState = true) {
+    const d = docs.get(key);
+    if (!d) return;
+    current = key;
+    $('current-section').textContent = d.path;
+
+    let html = marked.parse(preprocess(d.raw));
+    content.innerHTML =
+      `<div id="crumb">${escapeHtml(rootName)} / ${escapeHtml(d.path)}</div>` + html;
+
+    // fix links
+    content.querySelectorAll('a').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      if (href.startsWith('wikilink:')) {
+        const [page, h] = href.slice(9).split('#');
+        const target = resolveDoc(decodeURIComponent(page), d.path);
+        wireInternal(a, target, h, page);
+      } else if (/^[^:]*\.(md|markdown)(#.*)?$/i.test(href)) {
+        const [p, h] = href.split('#');
+        const target = resolveDoc(p, d.path);
+        wireInternal(a, target, h, p);
+      } else if (href.startsWith('#')) {
+        a.addEventListener('click', ev => { ev.preventDefault(); scrollToHash(href.slice(1)); });
+      } else if (/^https?:/i.test(href)) {
+        a.target = '_blank'; a.rel = 'noopener';
+      }
+    });
+
+    // fix images
+    content.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      if (!/^(https?:|data:)/i.test(src)) {
+        const url = resolveAsset(src, d.path);
+        if (url) img.src = url; else img.alt = (img.alt || src) + ' (image not found in folder)';
+      }
+    });
+
+    // give headings ids
+    content.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => { h.id = slug(h.textContent); });
+
+    // backlinks
+    const bl = backlinkIndex.get(key);
+    if (bl && bl.size) {
+      const div = document.createElement('div');
+      div.id = 'backlinks';
+      div.innerHTML = '<div class="bl-title">Linked from</div>';
+      [...bl].sort().forEach(bk => {
+        const a = document.createElement('a');
+        a.href = '#'; a.textContent = docs.get(bk).title;
+        a.addEventListener('click', ev => { ev.preventDefault(); render(bk); });
+        div.appendChild(a);
+      });
+      content.appendChild(div);
+    }
+
+    // sidebar active state
+    filelist.querySelectorAll('.file-item').forEach(el =>
+      el.classList.toggle('active', el.dataset.key === key));
+
+    main.scrollTop = 0;
+    if (hash) scrollToHash(slug(decodeURIComponent(hash)));
+    if (pushState) history.pushState({ key }, '', '#' + encodeURIComponent(d.path));
+    document.title = d.title + ' — Folio';
+    if (window.innerWidth <= 760) {
+      sidebar.classList.remove('open');
+      $('menu-toggle').setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function wireInternal(a, target, hash, origText) {
+    if (target) {
+      a.href = '#';
+      a.addEventListener('click', ev => { ev.preventDefault(); render(target, hash); });
+    } else {
+      a.classList.add('dead');
+      a.removeAttribute('href');
+      a.title = 'Not found in this folder: ' + origText;
+    }
+  }
+
+  function scrollToHash(id) {
+    const el = document.getElementById(id) || document.getElementById(slug(id));
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function slug(t) {
+    return t.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  /* ---------------- sidebar ---------------- */
+
+  function pickHome() {
+    const names = ['readme.md', 'index.md', 'home.md', 'main.md'];
+    for (const n of names) {
+      for (const [k, d] of docs) if (d.name.toLowerCase() === n) return k;
+    }
+    return docs.keys().next().value;
+  }
+
+  function buildSidebar() {
+    $('wiki-title').textContent = rootName;
+    $('wiki-meta').textContent = 'markdown wiki';
+    $('doc-count').textContent = docs.size + ' page' + (docs.size === 1 ? '' : 's');
+    filelist.innerHTML = '';
+
+    // group by directory
+    const groups = new Map();
+    for (const [k, d] of docs) {
+      const dir = d.path.includes('/') ? d.path.slice(0, d.path.lastIndexOf('/')) : '';
+      if (!groups.has(dir)) groups.set(dir, []);
+      groups.get(dir).push([k, d]);
+    }
+    const sortedDirs = [...groups.keys()].sort();
+
+    for (const dir of sortedDirs) {
+      if (dir) {
+        const lab = document.createElement('div');
+        lab.className = 'dir-label'; lab.textContent = dir;
+        filelist.appendChild(lab);
+      }
+      groups.get(dir)
+        .sort((a, b) => a[1].title.localeCompare(b[1].title))
+        .forEach(([k, d]) => {
+          const el = document.createElement('a');
+          el.className = 'file-item'; el.dataset.key = k;
+          el.textContent = d.title; el.title = d.path; el.href = '#';
+          el.addEventListener('click', ev => { ev.preventDefault(); render(k); });
+          filelist.appendChild(el);
+        });
+    }
+  }
+
+  /* ---------------- search ---------------- */
+
+  function search(q) {
+    q = q.trim();
+    if (!q) {
+      results.style.display = 'none'; filelist.style.display = 'block';
+      return;
+    }
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const scored = [];
+    for (const [k, d] of docs) {
+      const hay = d.raw.toLowerCase(), titleL = d.title.toLowerCase();
+      let score = 0, firstIdx = -1;
+      let allFound = true;
+      for (const t of terms) {
+        const inTitle = titleL.includes(t);
+        let idx = hay.indexOf(t), count = 0;
+        while (idx !== -1 && count < 50) { count++; idx = hay.indexOf(t, idx + t.length); }
+        if (!count && !inTitle) { allFound = false; break; }
+        score += count + (inTitle ? 25 : 0);
+        const fi = hay.indexOf(t);
+        if (fi !== -1 && (firstIdx === -1 || fi < firstIdx)) firstIdx = fi;
+      }
+      if (allFound) scored.push({ k, d, score, firstIdx });
+    }
+    scored.sort((a, b) => b.score - a.score);
+
+    results.innerHTML = '';
+    if (!scored.length) {
+      results.innerHTML = '<div id="no-results">No matches.</div>';
+    }
+    for (const { k, d, firstIdx } of scored.slice(0, 40)) {
+      const div = document.createElement('div');
+      div.className = 'result';
+      const snip = makeSnippet(d.raw, firstIdx, terms);
+      div.innerHTML = `<div class="rtitle">${highlight(escapeHtml(d.title), terms)}</div>` +
+                      `<div class="rsnip">${snip}</div>`;
+      div.addEventListener('click', () => {
+        render(k);
+        searchbox.value = ''; search('');
+        setTimeout(() => highlightInContent(terms), 60);
+      });
+      results.appendChild(div);
+    }
+    filelist.style.display = 'none';
+    results.style.display = 'block';
+  }
+
+  function makeSnippet(raw, idx, terms) {
+    if (idx < 0) idx = 0;
+    const start = Math.max(0, idx - 60);
+    let s = raw.slice(start, start + 200).replace(/[#*`>|\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    return (start > 0 ? '…' : '') + highlight(escapeHtml(s), terms) + '…';
+  }
+
+  function highlight(escaped, terms) {
+    let out = escaped;
+    for (const t of terms) {
+      const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      out = out.replace(re, '<mark>$1</mark>');
+    }
+    return out;
+  }
+
+  function highlightInContent(terms) {
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      if (n.parentElement.closest('pre, code, #crumb')) continue;
+      nodes.push(n);
+    }
+    let first = null;
+    for (const n of nodes) {
+      const txt = n.textContent;
+      const low = txt.toLowerCase();
+      if (!terms.some(t => low.includes(t))) continue;
+      const span = document.createElement('span');
+      span.innerHTML = highlight(escapeHtml(txt), terms);
+      n.parentNode.replaceChild(span, n);
+      if (!first) first = span.querySelector('mark');
+    }
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /* ---------------- folder opening ---------------- */
+
+  function filesFromInput(fileList) {
+    return [...fileList].map(f => ({ relPath: f.webkitRelativePath || f.name, file: f }));
+  }
+
+  async function filesFromDrop(dt) {
+    const out = [];
+    const entries = [...dt.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    async function walk(entry, path) {
+      if (entry.isFile) {
+        const file = await new Promise((res, rej) => entry.file(res, rej));
+        out.push({ relPath: path + entry.name, file });
+      } else if (entry.isDirectory) {
+        if (/^(node_modules|\.git|\.obsidian)$/.test(entry.name)) return;
+        const reader = entry.createReader();
+        let batch;
+        do {
+          batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+          for (const e of batch) await walk(e, path + entry.name + '/');
+        } while (batch.length);
+      }
+    }
+    for (const e of entries) await walk(e, '');
+    return out;
+  }
+
+  async function openWiki(fileEntries) {
+    const dropTitle = document.querySelector('.drop-title');
+    const dropSub = document.querySelector('.drop-sub');
+    const oldTitle = dropTitle.textContent;
+    const oldSub = dropSub.textContent;
+    dropTitle.textContent = 'Reading your archive…';
+    dropSub.textContent = 'Files stay on this device';
+    $('dropzone').setAttribute('aria-busy', 'true');
+    const ok = await ingestFiles(fileEntries);
+    if (!ok) {
+      dropTitle.textContent = oldTitle;
+      dropSub.textContent = oldSub;
+      $('dropzone').removeAttribute('aria-busy');
+      return;
+    }
+    landing.classList.add('hidden');
+    sidebar.classList.remove('hidden');
+    main.classList.remove('hidden');
+    buildSidebar();
+    render(pickHome());
+  }
+
+  /* ---------------- wiring ---------------- */
+
+  $('dropzone').addEventListener('click', () => $('dirpicker').click());
+  $('dropzone').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      $('dirpicker').click();
+    }
+  });
+  $('reopen').addEventListener('click', () => $('dirpicker').click());
+  $('menu-toggle').addEventListener('click', () => {
+    const isOpen = sidebar.classList.toggle('open');
+    $('menu-toggle').setAttribute('aria-expanded', String(isOpen));
+  });
+  $('dirpicker').addEventListener('change', e => {
+    if (e.target.files.length) openWiki(filesFromInput(e.target.files));
+    e.target.value = '';
+  });
+
+  ['dragover', 'dragenter'].forEach(ev =>
+    document.addEventListener(ev, e => {
+      e.preventDefault();
+      $('dropzone').classList.add('dragover');
+    }));
+  ['dragleave', 'drop'].forEach(ev =>
+    document.addEventListener(ev, e => {
+      e.preventDefault();
+      $('dropzone').classList.remove('dragover');
+    }));
+  document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const files = await filesFromDrop(e.dataTransfer);
+    if (files.length) openWiki(files);
+  });
+
+  searchbox.addEventListener('input', () => search(searchbox.value));
+  searchbox.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { searchbox.value = ''; search(''); searchbox.blur(); }
+    if (e.key === 'Enter') {
+      const first = results.querySelector('.result');
+      if (first) first.click();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); searchbox.focus(); searchbox.select();
+    }
+  });
+
+  window.addEventListener('popstate', e => {
+    if (e.state && e.state.key && docs.has(e.state.key)) render(e.state.key, null, false);
+  });
+})();
+</script>
+</body>
+</html>
